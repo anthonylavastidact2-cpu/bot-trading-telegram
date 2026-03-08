@@ -1,5 +1,5 @@
 # estrategias.py
-# Versión robusta con yfinance + reintentos + validación de datos
+# Versión robusta con yfinance + reintentos + validación de datos + normalización de columnas
 
 import time
 import random
@@ -17,6 +17,7 @@ def get_activo_data(simbolo, max_reintentos=3):
     """
     Descarga datos de 1h, 15m y 5m para un símbolo usando yfinance.
     Implementa reintentos automáticos y validación de datos mínimos.
+    Retorna un diccionario con los dataframes en minúsculas.
     """
     for intento in range(1, max_reintentos + 1):
         try:
@@ -35,7 +36,7 @@ def get_activo_data(simbolo, max_reintentos=3):
             if df_5m.empty or len(df_5m) < 30:
                 raise ValueError(f"Datos insuficientes para 5m: {len(df_5m)} filas")
 
-            # Renombrar columnas a minúsculas para consistencia (opcional)
+            # Normalizar nombres de columnas a minúsculas
             df_1h.columns = [c.lower() for c in df_1h.columns]
             df_15m.columns = [c.lower() for c in df_15m.columns]
             df_5m.columns = [c.lower() for c in df_5m.columns]
@@ -57,13 +58,20 @@ def get_activo_data(simbolo, max_reintentos=3):
 # FUNCIÓN: Calcular indicadores técnicos (con validación)
 # ------------------------------------------------------------
 def calcular_indicadores(df):
-    """Añade RSI, EMA20 y ATR% a un dataframe, verificando que haya suficientes datos."""
+    """
+    Añade RSI, EMA20 y ATR% a un dataframe, verificando que haya suficientes datos.
+    Primero normaliza las columnas a minúsculas.
+    """
     if df is None or len(df) < 20:
         print(f"DataFrame con muy pocos datos ({len(df) if df is not None else 0}) para calcular indicadores")
         return None
+
     df = df.copy()
+    # Normalizar nombres de columnas a minúsculas por si acaso
+    df.columns = [c.lower() for c in df.columns]
+
     try:
-        # Asegurar que las columnas existen
+        # Asegurar que las columnas necesarias existen
         required_cols = ['close', 'high', 'low']
         if not all(col in df.columns for col in required_cols):
             print(f"Columnas requeridas no encontradas: {df.columns.tolist()}")
@@ -251,16 +259,13 @@ def backtest_estrategia(simbolo, periodo_dias=180):
     if df.empty or len(df) < 20:
         return {"mensaje": "No se generaron operaciones en el período."}
 
-    # Renombrar columnas
+    # Renombrar columnas a minúsculas
     df.columns = [c.lower() for c in df.columns]
     df = calcular_indicadores(df)
     if df is None:
         return {"mensaje": "Error calculando indicadores para backtest."}
 
     operaciones = []
-    capital = 1000
-    riesgo_por_operacion = 0.02 * capital
-
     for i in range(20, len(df)-1):
         fila = df.iloc[i]
         fila_sig = df.iloc[i+1]
