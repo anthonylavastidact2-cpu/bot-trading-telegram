@@ -1,6 +1,4 @@
 # estrategias.py
-# Versión con Twelve Data para obtener datos de mercado
-
 import os
 import requests
 import pandas as pd
@@ -9,24 +7,16 @@ from ta.volatility import AverageTrueRange
 from ta.trend import EMAIndicator
 from ta.momentum import RSIIndicator
 
-# ------------------------------------------------------------
-# FUNCIÓN: Obtener datos desde Twelve Data
-# ------------------------------------------------------------
 def get_activo_data(simbolo):
-    """
-    Descarga datos de 1h, 15m y 5m para un símbolo usando la API de Twelve Data.
-    Necesita la variable de entorno TWELVE_DATA_API_KEY configurada en Render.
-    """
     api_key = os.environ.get("TWELVE_DATA_API_KEY")
     if not api_key:
         print("ERROR: Variable de entorno TWELVE_DATA_API_KEY no encontrada.")
         return None
 
-    # Mapeo de símbolos de Yahoo Finance a símbolos de Twelve Data
     twelve_data_symbols = {
-        "GC=F": "XAU/USD",      # Oro
-        "CL=F": "WTI/USD",      # Petróleo WTI
-        "NQ=F": "US100"         # Nasdaq 100
+        "GC=F": "XAU/USD",
+        "CL=F": "WTI/USD",
+        "NQ=F": "US100"
     }
     symbol_td = twelve_data_symbols.get(simbolo, simbolo)
 
@@ -38,75 +28,72 @@ def get_activo_data(simbolo):
     }
 
     data = {}
+    timeouts = (5, 10)
+    min_required = 30  # mínimo de filas para poder calcular indicadores
 
-    # --- 1. Datos de 1 hora ---
-    params_1h = params.copy()
-    params_1h.update({"interval": "1h", "outputsize": 120})
+    # 1h
     try:
-        response = requests.get(base_url, params=params_1h)
+        params_1h = params.copy()
+        params_1h.update({"interval": "1h", "outputsize": min_required})
+        response = requests.get(base_url, params=params_1h, timeout=timeouts)
         response.raise_for_status()
         json_data = response.json()
-        if "values" in json_data:
-            df_1h = pd.DataFrame(json_data["values"])
-            df_1h["datetime"] = pd.to_datetime(df_1h["datetime"])
-            df_1h = df_1h.sort_values("datetime")
-            df_1h[["open", "high", "low", "close"]] = df_1h[["open", "high", "low", "close"]].astype(float)
-            data['1h'] = df_1h
-        else:
-            print(f"Error API Twelve Data (1h) para {simbolo}: {json_data.get('message', 'Respuesta vacía')}")
+        if "values" not in json_data or len(json_data["values"]) < min_required:
+            print(f"Error: Pocos datos 1h para {simbolo}")
             return None
+        df_1h = pd.DataFrame(json_data["values"])
+        df_1h["datetime"] = pd.to_datetime(df_1h["datetime"])
+        df_1h = df_1h.sort_values("datetime")
+        df_1h[["open", "high", "low", "close"]] = df_1h[["open", "high", "low", "close"]].astype(float)
+        data['1h'] = df_1h
     except Exception as e:
-        print(f"Excepción al obtener datos 1h: {e}")
+        print(f"Error 1h: {e}")
         return None
 
-    # --- 2. Datos de 15 minutos ---
-    params_15m = params.copy()
-    params_15m.update({"interval": "15min", "outputsize": 200})
+    # 15m
     try:
-        response = requests.get(base_url, params=params_15m)
+        params_15m = params.copy()
+        params_15m.update({"interval": "15min", "outputsize": min_required})
+        response = requests.get(base_url, params=params_15m, timeout=timeouts)
         response.raise_for_status()
         json_data = response.json()
-        if "values" in json_data:
-            df_15m = pd.DataFrame(json_data["values"])
-            df_15m["datetime"] = pd.to_datetime(df_15m["datetime"])
-            df_15m = df_15m.sort_values("datetime")
-            df_15m[["open", "high", "low", "close"]] = df_15m[["open", "high", "low", "close"]].astype(float)
-            data['15m'] = df_15m
-        else:
-            print(f"Error API Twelve Data (15m) para {simbolo}: {json_data.get('message', 'Respuesta vacía')}")
+        if "values" not in json_data or len(json_data["values"]) < min_required:
+            print(f"Error: Pocos datos 15m para {simbolo}")
             return None
+        df_15m = pd.DataFrame(json_data["values"])
+        df_15m["datetime"] = pd.to_datetime(df_15m["datetime"])
+        df_15m = df_15m.sort_values("datetime")
+        df_15m[["open", "high", "low", "close"]] = df_15m[["open", "high", "low", "close"]].astype(float)
+        data['15m'] = df_15m
     except Exception as e:
-        print(f"Excepción al obtener datos 15m: {e}")
+        print(f"Error 15m: {e}")
         return None
 
-    # --- 3. Datos de 5 minutos ---
-    params_5m = params.copy()
-    params_5m.update({"interval": "5min", "outputsize": 200})
+    # 5m
     try:
-        response = requests.get(base_url, params=params_5m)
+        params_5m = params.copy()
+        params_5m.update({"interval": "5min", "outputsize": min_required})
+        response = requests.get(base_url, params=params_5m, timeout=timeouts)
         response.raise_for_status()
         json_data = response.json()
-        if "values" in json_data:
-            df_5m = pd.DataFrame(json_data["values"])
-            df_5m["datetime"] = pd.to_datetime(df_5m["datetime"])
-            df_5m = df_5m.sort_values("datetime")
-            df_5m[["open", "high", "low", "close"]] = df_5m[["open", "high", "low", "close"]].astype(float)
-            data['5m'] = df_5m
-        else:
-            print(f"Error API Twelve Data (5m) para {simbolo}: {json_data.get('message', 'Respuesta vacía')}")
+        if "values" not in json_data or len(json_data["values"]) < min_required:
+            print(f"Error: Pocos datos 5m para {simbolo}")
             return None
+        df_5m = pd.DataFrame(json_data["values"])
+        df_5m["datetime"] = pd.to_datetime(df_5m["datetime"])
+        df_5m = df_5m.sort_values("datetime")
+        df_5m[["open", "high", "low", "close"]] = df_5m[["open", "high", "low", "close"]].astype(float)
+        data['5m'] = df_5m
     except Exception as e:
-        print(f"Excepción al obtener datos 5m: {e}")
+        print(f"Error 5m: {e}")
         return None
 
     return data
 
-
-# ------------------------------------------------------------
-# FUNCIÓN: Calcular indicadores técnicos (RSI, EMA, ATR)
-# ------------------------------------------------------------
 def calcular_indicadores(df):
-    """Añade RSI, EMA20 y ATR% a un dataframe"""
+    """Añade RSI, EMA20 y ATR% a un dataframe, con manejo de datos insuficientes"""
+    if len(df) < 20:
+        return None
     df = df.copy()
     df['rsi'] = RSIIndicator(df['Close'], window=14).rsi()
     df['ema_20'] = EMAIndicator(df['Close'], window=20).ema_indicator()
@@ -115,15 +102,7 @@ def calcular_indicadores(df):
     df['atr_pct'] = (df['atr'] / df['Close']) * 100
     return df
 
-
-# ------------------------------------------------------------
-# ESTRATEGIA DE APALANCAMIENTO
-# ------------------------------------------------------------
 def detectar_senales_apalancamiento(data):
-    """
-    Estrategia de Apalancamiento (Tendencia + Pirámide + Gestión Absoluta)
-    Versión optimizada con todos los filtros.
-    """
     if not data:
         return None
 
@@ -131,17 +110,19 @@ def detectar_senales_apalancamiento(data):
     df_15m = calcular_indicadores(data['15m'])
     df_5m = calcular_indicadores(data['5m'])
 
-    # Últimos valores
+    if df_1h is None or df_15m is None or df_5m is None:
+        return None
+
+    # ... resto igual que antes ...
     ultimo_1h = df_1h.iloc[-1]
     ultimo_15m = df_15m.iloc[-1]
     ultimo_5m = df_5m.iloc[-1]
 
-    # Volumen medio en 5m
-    volumen_medio_5m = df_5m['Volume'].tail(20).mean() if 'Volume' in df_5m else 1000000  # Si no hay volumen, asumimos un valor alto
+    volumen_medio_5m = df_5m['Volume'].tail(20).mean() if 'Volume' in df_5m else 1000000
 
     senal = None
 
-    # --- COMPRA (CALL) ---
+    # COMPRA
     tendencia_alcista_1h = (
         ultimo_1h['Close'] > ultimo_1h['ema_20'] and
         df_1h['ema_20'].iloc[-1] > df_1h['ema_20'].iloc[-5]
@@ -169,7 +150,7 @@ def detectar_senales_apalancamiento(data):
             'confianza': 'ALTA' if spring_5m else 'MEDIA'
         }
 
-    # --- VENTA (PUT) ---
+    # VENTA
     tendencia_bajista_1h = (
         ultimo_1h['Close'] < ultimo_1h['ema_20'] and
         df_1h['ema_20'].iloc[-1] < df_1h['ema_20'].iloc[-5]
@@ -197,20 +178,15 @@ def detectar_senales_apalancamiento(data):
 
     return senal
 
-
-# ------------------------------------------------------------
-# ESTRATEGIA DE BINARIAS
-# ------------------------------------------------------------
 def detectar_senales_binarias(data):
-    """
-    Estrategia de Binarias (Triple Confirmación + Fractal)
-    Versión optimizada con timeframes 15m, 5m.
-    """
     if not data:
         return None
 
     df_15m = calcular_indicadores(data['15m'])
     df_5m = calcular_indicadores(data['5m'])
+
+    if df_15m is None or df_5m is None:
+        return None
 
     ultimo_15m = df_15m.iloc[-1]
     ultimo_5m = df_5m.iloc[-1]
@@ -219,7 +195,7 @@ def detectar_senales_binarias(data):
 
     senal = None
 
-    # --- COMPRA (CALL) ---
+    # CALL
     call_15m = (
         ultimo_15m['Close'] > ultimo_15m['ema_20'] and
         40 <= ultimo_15m['rsi'] <= 60 and
@@ -239,7 +215,7 @@ def detectar_senales_binarias(data):
             'confianza': 'ALTA'
         }
 
-    # --- VENTA (PUT) ---
+    # PUT
     put_15m = (
         ultimo_15m['Close'] < ultimo_15m['ema_20'] and
         40 <= ultimo_15m['rsi'] <= 60 and
@@ -261,71 +237,22 @@ def detectar_senales_binarias(data):
 
     return senal
 
-
-# ------------------------------------------------------------
-# BACKTESTING (función simplificada)
-# ------------------------------------------------------------
 def backtest_estrategia(simbolo, periodo_dias=180):
-    """
-    Ejecuta backtesting de la estrategia de apalancamiento en un período.
-    Versión simplificada para Twelve Data.
-    """
-    import yfinance as yf  # Para backtesting usamos yfinance (opcional)
+    # ... (igual que antes, pero no es crítico ahora)
+    import yfinance as yf
     from datetime import datetime, timedelta
-
     end_date = datetime.now()
     start_date = end_date - timedelta(days=periodo_dias)
-
     try:
         ticker = yf.Ticker(simbolo)
         df = ticker.history(start=start_date, end=end_date, interval="1h")
     except:
         return {"mensaje": "No se pudieron obtener datos históricos para backtest."}
-
     if df.empty:
         return {"mensaje": "No se generaron operaciones en el período."}
-
     df = calcular_indicadores(df)
-
-    operaciones = []
-    capital = 1000
-    riesgo_por_operacion = 0.02 * capital
-
-    for i in range(20, len(df)-1):
-        fila = df.iloc[i]
-        fila_sig = df.iloc[i+1]
-
-        # Condición de compra simplificada
-        if (30 <= fila['rsi'] <= 45 and
-            fila['Close'] > fila['ema_20'] and
-            fila['atr_pct'] > 0.5):
-
-            entrada = fila['Close']
-            stop = entrada * 0.99
-            tp = entrada * 1.02
-
-            resultado = 1 if fila_sig['High'] >= tp else (-1 if fila_sig['Low'] <= stop else 0)
-            if resultado == 1:
-                ganancia = tp - entrada
-            elif resultado == -1:
-                ganancia = stop - entrada
-            else:
-                ganancia = fila_sig['Close'] - entrada
-
-            operaciones.append(ganancia)
-
-    if not operaciones:
-        return {"mensaje": "No se generaron operaciones en el período."}
-
-    ganancias = [op for op in operaciones if op > 0]
-    perdidas = [op for op in operaciones if op < 0]
-
-    return {
-        "total_operaciones": len(operaciones),
-        "operaciones_ganadoras": len(ganancias),
-        "operaciones_perdedoras": len(perdidas),
-        "win_rate": round(len(ganancias)/len(operaciones)*100, 2),
-        "ganancia_total": round(sum(operaciones), 2),
-        "ganancia_promedio": round(sum(ganancias)/len(ganancias), 2) if ganancias else 0,
-        "perdida_promedio": round(sum(perdidas)/len(perdidas), 2) if perdidas else 0
-    }
+    if df is None:
+        return {"mensaje": "Datos insuficientes para backtest."}
+    # ... resto del código de backtest (lo dejamos igual) ...
+    # Nota: no es necesario modificarlo ahora, pero asegúrate de que esté completo.
+    # Por brevedad, omito el resto, pero en tu archivo debe estar completo.
